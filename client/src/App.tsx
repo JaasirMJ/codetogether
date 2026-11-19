@@ -1,12 +1,9 @@
-
-import Editor from "@monaco-editor/react";
+import CollaborativeEditor from "./CollaborativeEditor";
 import { useEffect, useState } from "react";
 import "./App.css";
 
 function App() {
-  const [code, setCode] = useState(
-  '// Welcome to CodeTogether!\n\nfunction hello() {\n  console.log("Hello, world!");\n}\n\nhello();'
-);
+  
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [activeRoom, setActiveRoom] = useState("");
@@ -83,6 +80,10 @@ if (activeRoom) {
           <span className="online-indicator">● Online</span>
         </div>
 
+        <button className="secondary-button" onClick={copyInvite}>
+  Copy invite link
+</button>
+
         <button className="secondary-button leave-button" onClick={leaveRoom}>
           Leave room
         </button>
@@ -97,25 +98,8 @@ if (activeRoom) {
       </section>
 
       <section className="editor-container">
-        <Editor
-          height="100%"
-          language="typescript"
-          theme="vs-dark"
-          value={code}
-          onChange={(value) => setCode(value ?? "")}
-          options={{
-            minimap: { enabled: false },
-            fontSize: 15,
-            fontFamily: "Consolas, monospace",
-            fontLigatures: true,
-            automaticLayout: true,
-            scrollBeyondLastLine: false,
-            padding: { top: 20 },
-            wordWrap: "on",
-            lineNumbers: "on",
-          }}
-        />
-      </section>
+  <CollaborativeEditor roomId={activeRoom} />
+</section>
 
       <footer className="workspace-footer">
         <span>CodeTogether Workspace</span>
