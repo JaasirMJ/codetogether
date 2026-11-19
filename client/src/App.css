@@ -295,3 +295,84 @@ footer {
     font-size: 9px;
   }
 }
+
+
+.workspace {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #090b12;
+  overflow: hidden;
+}
+
+.workspace-header {
+  height: 65px;
+  min-height: 65px;
+  padding: 0 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #272938;
+}
+
+.workspace-header .logo {
+  margin: 0;
+  font-size: 21px;
+}
+
+.workspace-info {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  color: #aaaec0;
+  font-size: 12px;
+}
+
+.online-indicator {
+  color: #4ade80;
+}
+
+.leave-button {
+  width: auto;
+  padding: 10px 18px;
+}
+
+.editor-toolbar {
+  height: 43px;
+  min-height: 43px;
+  padding: 0 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #11131d;
+  border-bottom: 1px solid #272938;
+  color: #c9cbd6;
+  font-size: 12px;
+}
+
+.file-icon {
+  margin-right: 10px;
+  color: #65b9e8;
+  font-weight: 700;
+}
+
+.language-label {
+  color: #85899a;
+}
+
+.editor-container {
+  flex: 1;
+  min-height: 0;
+}
+
+.workspace-footer {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #151522;
+  color: #9295a5;
+  font-size: 10px;
+}

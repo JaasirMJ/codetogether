@@ -1,8 +1,12 @@
 
+import Editor from "@monaco-editor/react";
 import { useEffect, useState } from "react";
 import "./App.css";
 
 function App() {
+  const [code, setCode] = useState(
+  '// Welcome to CodeTogether!\n\nfunction hello() {\n  console.log("Hello, world!");\n}\n\nhello();'
+);
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [activeRoom, setActiveRoom] = useState("");
@@ -67,39 +71,60 @@ function App() {
     window.history.pushState({}, "", "/");
   }
 
-  if (activeRoom) {
-    return (
-      <main className="app-shell">
-        <header className="topbar">
-          <h2 className="logo">CodeTogether<span>.</span></h2>
-          <button className="secondary-button" onClick={leaveRoom}>
-            Leave room
-          </button>
-        </header>
+  
+if (activeRoom) {
+  return (
+    <main className="workspace">
+      <header className="workspace-header">
+        <h2 className="logo">CodeTogether<span>.</span></h2>
 
-        <section className="room-card">
-          <span className="eyebrow">COLLABORATION ROOM</span>
-          <h1>You're in the room.</h1>
-          <p className="subtitle">
-            Welcome, {name}. Your collaborative workspace is ready.
-          </p>
+        <div className="workspace-info">
+          <span>ROOM: {activeRoom}</span>
+          <span className="online-indicator">● Online</span>
+        </div>
 
-          <div className="room-code">
-            <span>ROOM CODE</span>
-            <strong>{activeRoom}</strong>
-          </div>
+        <button className="secondary-button leave-button" onClick={leaveRoom}>
+          Leave room
+        </button>
+      </header>
 
-          <button className="primary-button" onClick={copyInvite}>
-            Copy invitation link ↗
-          </button>
+      <section className="editor-toolbar">
+        <div>
+          <span className="file-icon">TS</span>
+          <span>main.ts</span>
+        </div>
+        <span className="language-label">TypeScript</span>
+      </section>
 
-          <p className="room-note">
-            The shared editor and live chat will appear here in our next milestone.
-          </p>
-        </section>
-      </main>
-    );
-  }
+      <section className="editor-container">
+        <Editor
+          height="100%"
+          language="typescript"
+          theme="vs-dark"
+          value={code}
+          onChange={(value) => setCode(value ?? "")}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 15,
+            fontFamily: "Consolas, monospace",
+            fontLigatures: true,
+            automaticLayout: true,
+            scrollBeyondLastLine: false,
+            padding: { top: 20 },
+            wordWrap: "on",
+            lineNumbers: "on",
+          }}
+        />
+      </section>
+
+      <footer className="workspace-footer">
+        <span>CodeTogether Workspace</span>
+        <span>{name} · Room {activeRoom}</span>
+      </footer>
+    </main>
+  );
+}
+
 
   return (
     <main className="app-shell">
