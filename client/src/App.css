@@ -581,3 +581,44 @@ footer {
   }
 }
 
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #1e1e1e;
+  border-bottom: 1px solid #333;
+}
+
+.editor-filename {
+  color: #cccccc;
+  font-size: 13px;
+  font-family: Consolas, monospace;
+}
+
+.github-save-button {
+  margin-left: auto;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #238636;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.github-save-button:hover {
+  background: #2ea043;
+}
+
+.github-save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.github-save-message {
+  color: #cccccc;
+  font-size: 12px;
+}

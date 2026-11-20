@@ -10,9 +10,15 @@ interface ChatPanelProps {
   roomId: string;
   userId: string;
   userName: string;
+  collaborators: Record<string, string>;
 }
 
-function ChatPanel({ roomId, userId, userName }: ChatPanelProps) {
+function ChatPanel({
+  roomId,
+  userId,
+  userName,
+  collaborators,
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -124,8 +130,10 @@ function ChatPanel({ roomId, userId, userName }: ChatPanelProps) {
                 }`}
               >
                 <div className="message-sender">
-                  {isOwnMessage ? "You" : item.senderUserId}
-                </div>
+  {isOwnMessage
+    ? "You"
+    : collaborators[item.senderUserId] || "Collaborator"}
+</div>
 
                 <div className="message-bubble">
                   {item.text}

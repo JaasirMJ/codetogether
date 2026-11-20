@@ -17,14 +17,28 @@ hello();
 
 interface CollaborativeEditorProps {
   roomId: string;
+  displayName: string;
+  userId: string;
+  onCollaboratorsChange: (users: Record<string, string>) => void;
 }
 
-function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
+function CollaborativeEditor({
+  roomId,
+  displayName,
+  userId,
+  onCollaboratorsChange,
+}: CollaborativeEditorProps) {
   const [editorInstance, setEditorInstance] =
     useState<editor.IStandaloneCodeEditor | null>(null);
 
   const [connectionStatus, setConnectionStatus] =
     useState("Connecting...");
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  const [sharedDocument, setSharedDocument] =
+    useState<Y.Text | null>(null);
 
   const handleEditorMount: OnMount = (editor) => {
     setEditorInstance(editor);
@@ -33,18 +47,15 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
   useEffect(() => {
     if (!editorInstance) return;
 
-    // 1. Create a shared Yjs document
     const ydoc = new Y.Doc();
     const ytext = ydoc.getText("codetogether");
 
-    // 2. Connect to the Yjs WebSocket server
     const provider = new WebsocketProvider(
       "ws://localhost:1234",
       `codetogether-${roomId}`,
       ydoc
     );
 
-    // 3. Get the Monaco editor model
     const model = editorInstance.getModel();
 
     if (!model) {
@@ -53,7 +64,6 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
       return;
     }
 
-    // 4. Give this collaborator a unique identity
     const colors = [
       "#E06C75",
       "#61AFEF",
@@ -65,15 +75,12 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
     const userColor =
       colors[Math.floor(Math.random() * colors.length)];
 
-    const userName =
-      `Coder-${Math.floor(100 + Math.random() * 900)}`;
-
     provider.awareness.setLocalStateField("user", {
-      name: userName,
+      name: displayName.trim() || "Collaborator",
       color: userColor,
+      userId,
     });
 
-    // 5. Create styles for remote collaborators' cursors
     const cursorStyle = document.createElement("style");
 
     cursorStyle.id = `codetogether-cursors-${roomId}`;
@@ -128,13 +135,25 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
         })
         .join("\n");
 
+      const collaborators: Record<string, string> = {};
+
+      provider.awareness.getStates().forEach((state) => {
+        const user = state.user as
+          | { name?: string; userId?: string }
+          | undefined;
+
+        if (user?.userId) {
+          collaborators[user.userId] = user.name || "Collaborator";
+        }
+      });
+
+      onCollaboratorsChange(collaborators);
       cursorStyle.textContent = css;
     };
 
     provider.awareness.on("update", updateCursorStyles);
     updateCursorStyles();
 
-    // 6. Track the connection status
     provider.on("status", ({ status }: { status: string }) => {
       setConnectionStatus(
         status === "connected" ? "Connected" : "Connecting..."
@@ -143,21 +162,17 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
       console.log(`[Yjs ${roomId}] Connection status:`, status);
     });
 
-    // Keep track of the Monaco-Yjs binding
     let binding: MonacoBinding | null = null;
 
-    // 7. Wait until the shared document has synchronized
     provider.on("sync", (isSynced: boolean) => {
       if (!isSynced || binding) return;
 
       console.log(`[Yjs ${roomId}] Document synchronized`);
 
-      // Add starter code only if the shared document is empty
       if (ytext.length === 0) {
         ytext.insert(0, STARTER_CODE);
       }
 
-      // 8. Connect Monaco editor with Yjs
       binding = new MonacoBinding(
         ytext,
         model,
@@ -165,10 +180,11 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
         provider.awareness
       );
 
+      setSharedDocument(ytext);
+
       console.log(`[Yjs ${roomId}] Monaco binding initialized`);
     });
 
-    // 9. Observe document changes
     ytext.observe(() => {
       console.log(
         `[Yjs ${roomId}] Document updated:`,
@@ -176,7 +192,6 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
       );
     });
 
-    // 10. Cleanup when leaving the room
     return () => {
       binding?.destroy();
 
@@ -184,18 +199,87 @@ function CollaborativeEditor({ roomId }: CollaborativeEditorProps) {
 
       cursorStyle.remove();
 
+      setSharedDocument(null);
+
       provider.destroy();
       ydoc.destroy();
 
       console.log(`[Yjs ${roomId}] Connection cleaned up`);
     };
-  }, [roomId, editorInstance]);
+  }, [roomId, editorInstance, displayName, userId, onCollaboratorsChange]);
+
+  // Save the shared Yjs document to GitHub
+  const saveToGitHub = async () => {
+    if (!sharedDocument) {
+      setSaveMessage("Shared document is not ready yet.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveMessage("");
+
+      const response = await fetch(
+        "http://localhost:5000/api/github/commit",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            roomId,
+            fileName: "main.ts",
+            content: sharedDocument.toString(),
+            commitMessage: `Save collaborative code from room ${roomId}`,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "GitHub save failed");
+      }
+
+      setSaveMessage("Successfully saved to GitHub!");
+
+      console.log("[GitHub] Commit URL:", data.commitUrl);
+    } catch (error) {
+      console.error("[GitHub] Save error:", error);
+
+      setSaveMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to save to GitHub."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="collaborative-editor">
       <div className="editor-connection">
         <span className="online-indicator">●</span>
         {connectionStatus}
+      </div>
+
+      <div className="editor-toolbar">
+        <span className="editor-filename">main.ts</span>
+
+        <button
+          className="github-save-button"
+          onClick={saveToGitHub}
+          disabled={isSaving || !sharedDocument}
+        >
+          {isSaving ? "Saving..." : "Save to GitHub"}
+        </button>
+
+        {saveMessage && (
+          <span className="github-save-message">
+            {saveMessage}
+          </span>
+        )}
       </div>
 
       <Editor

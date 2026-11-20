@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import "./App.css";
 
 function App() {
+  const [collaborators, setCollaborators] = useState<Record<string, string>>({});
   const [isConnecting, setIsConnecting] = useState(false);
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -158,13 +159,19 @@ function App() {
 
         <div className="workspace-main">
           <section className="editor-container">
-            <CollaborativeEditor roomId={activeRoom} />
+            <CollaborativeEditor
+  roomId={activeRoom}
+  displayName={name}
+  userId={userId}
+  onCollaboratorsChange={setCollaborators}
+/>
           </section>
 
           <ChatPanel
             roomId={activeRoom}
             userId={userId}
             userName={name}
+            collaborators={collaborators}
           />
         </div>
 
