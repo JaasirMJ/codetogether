@@ -1,5 +1,6 @@
 
-import { connectNexconn } from "./lib/nexconn";
+import ChatPanel from "./ChatPanel-temp";
+import { connectNexconn, openRoomGroup } from "./lib/nexconn";
 import CollaborativeEditor from "./CollaborativeEditor";
 import { useEffect, useState } from "react";
 import "./App.css";
@@ -11,6 +12,7 @@ function App() {
   const [activeRoom, setActiveRoom] = useState("");
   const [error, setError] = useState("");
   const [nexconnStatus, setNexconnStatus] = useState("Disconnected");
+  const [userId, setUserId] = useState("");
 
   // Read room code from an invitation URL
   useEffect(() => {
@@ -23,26 +25,34 @@ function App() {
   }, []);
 
   // Connect to Nexconn before entering a room
-  async function connectAndEnterRoom(code: string) {
+  async function connectAndEnterRoom(
+    code: string,
+    isCreator: boolean
+  ) {
     setError("");
     setIsConnecting(true);
 
     try {
-      let userId = localStorage.getItem("codetogether-user-id");
+      let currentUserId = localStorage.getItem("codetogether-user-id");
 
-      if (!userId) {
-        userId = crypto.randomUUID();
-        localStorage.setItem("codetogether-user-id", userId);
+      if (!currentUserId) {
+        currentUserId = crypto.randomUUID();
+        localStorage.setItem("codetogether-user-id", currentUserId);
       }
 
-      await connectNexconn(userId, name.trim());
+      setUserId(currentUserId);
+
+      await connectNexconn(currentUserId, name.trim());
+
       setNexconnStatus("Connected");
+
+      await openRoomGroup(code, isCreator,currentUserId);
 
       enterRoom(code);
     } catch (err) {
+      console.error("Nexconn room error:", err);
       setNexconnStatus("Disconnected");
-      console.error("Nexconn connection error:", err);
-      setError("Unable to connect to Nexconn. Please try again.");
+      setError("Unable to connect to the Nexconn room. Please try again.");
     } finally {
       setIsConnecting(false);
     }
@@ -60,7 +70,7 @@ function App() {
       .substring(2, 8)
       .toUpperCase();
 
-    await connectAndEnterRoom(newRoomCode);
+    await connectAndEnterRoom(newRoomCode, true);
   }
 
   // Join an existing room
@@ -75,7 +85,10 @@ function App() {
       return;
     }
 
-    await connectAndEnterRoom(roomCode.trim().toUpperCase());
+    await connectAndEnterRoom(
+      roomCode.trim().toUpperCase(),
+      false
+    );
   }
 
   // Enter the workspace
@@ -102,6 +115,7 @@ function App() {
   // Leave the current room
   function leaveRoom() {
     setActiveRoom("");
+    setNexconnStatus("Disconnected");
     window.history.pushState({}, "", "/");
   }
 
@@ -115,11 +129,11 @@ function App() {
           </h2>
 
           <div className="workspace-info">
-  <span>ROOM: {activeRoom}</span>
-  <span className="online-indicator">
-    ● Nexconn: {nexconnStatus}
-  </span>
-</div>
+            <span>ROOM: {activeRoom}</span>
+            <span className="online-indicator">
+              ● Nexconn: {nexconnStatus}
+            </span>
+          </div>
 
           <button className="secondary-button" onClick={copyInvite}>
             Copy invite link
@@ -142,9 +156,17 @@ function App() {
           <span className="language-label">TypeScript</span>
         </section>
 
-        <section className="editor-container">
-          <CollaborativeEditor roomId={activeRoom} />
-        </section>
+        <div className="workspace-main">
+          <section className="editor-container">
+            <CollaborativeEditor roomId={activeRoom} />
+          </section>
+
+          <ChatPanel
+            roomId={activeRoom}
+            userId={userId}
+            userName={name}
+          />
+        </div>
 
         <footer className="workspace-footer">
           <span>CodeTogether Workspace</span>

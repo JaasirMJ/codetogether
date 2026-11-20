@@ -432,3 +432,152 @@ footer {
   z-index: 1000;
 }
 
+.workspace-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  padding: 16px;
+  height: calc(100vh - 150px);
+  min-height: 0;
+}
+
+.workspace-main .editor-container {
+  min-width: 0;
+  height: 100%;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  background: #111827;
+  border: 1px solid #293244;
+  border-radius: 10px;
+  overflow: hidden;
+  color: #fff;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #293244;
+}
+
+.chat-header h3 {
+  margin: 0 0 5px;
+}
+
+.chat-header span {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.chat-status {
+  color: #22c55e !important;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.chat-empty {
+  text-align: center;
+  color: #9ca3af;
+  margin-top: 60px;
+}
+
+.chat-empty span {
+  font-size: 28px;
+}
+
+.chat-message {
+  margin-bottom: 16px;
+}
+
+.message-sender,
+.message-time {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-bottom: 5px;
+}
+
+.message-bubble {
+  display: inline-block;
+  max-width: 90%;
+  padding: 9px 12px;
+  background: #263247;
+  border-radius: 9px;
+  overflow-wrap: anywhere;
+}
+
+.own-message {
+  text-align: right;
+}
+
+.own-message .message-bubble {
+  background: #2563eb;
+  text-align: left;
+}
+
+.message-time {
+  display: block;
+  margin-top: 4px;
+}
+
+.chat-input-area {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #293244;
+}
+
+.chat-input-area input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: #1f2937;
+  color: white;
+}
+
+.chat-input-area button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.chat-input-area button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-error {
+  padding: 0 12px;
+  color: #f87171;
+  font-size: 12px;
+}
+
+@media (max-width: 800px) {
+  .workspace-main {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .workspace-main .editor-container {
+    height: 60vh;
+  }
+
+  .chat-panel {
+    height: 400px;
+  }
+}
+

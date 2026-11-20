@@ -96,6 +96,79 @@ app.post("/api/nexconn/token", async (req, res) => {
   }
 });
 
+
+// Add a user to an existing Nexconn group
+app.post("/api/nexconn/group/join", async (req, res) => {
+  try {
+    const { roomId, userId } = req.body;
+
+    if (!roomId || !userId) {
+      return res.status(400).json({
+        error: "roomId and userId are required",
+      });
+    }
+
+    const appKey = process.env.NEXCONN_APP_KEY;
+    const appSecret = process.env.NEXCONN_APP_SECRET;
+    const apiBase = process.env.NEXCONN_API_BASE_URL;
+
+    if (!appKey || !appSecret || !apiBase) {
+      return res.status(500).json({
+        error: "Nexconn server configuration is missing",
+      });
+    }
+
+    const nonce = randomBytes(9).toString("hex");
+    const timestamp = Date.now().toString();
+
+    const signature = createHash("sha1")
+      .update(appSecret + nonce + timestamp)
+      .digest("hex");
+
+    const response = await fetch(
+      `${apiBase}/v4/group-channel/join`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "App-Key": appKey,
+          Nonce: nonce,
+          Timestamp: timestamp,
+          Signature: signature,
+        },
+        body: JSON.stringify({
+          channelId: roomId,
+          userIds: [userId],
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    console.log("[Nexconn] Add group member response:", data);
+
+    if (!response.ok || data.code !== 0) {
+      return res.status(502).json({
+        error: "Failed to add user to Nexconn group",
+        details: data,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "User added to Nexconn group",
+      result: data.result,
+    });
+  } catch (error) {
+    console.error("[Nexconn] Group member error:", error);
+
+    return res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
+
