@@ -591,11 +591,27 @@ footer {
   border-bottom: 1px solid #333;
 }
 
+
 .editor-filename {
+  width: 200px;
+  padding: 7px 10px;
+  background: #252526;
   color: #cccccc;
+  border: 1px solid #454545;
+  border-radius: 5px;
   font-size: 13px;
   font-family: Consolas, monospace;
+  outline: none;
 }
+
+.editor-filename:focus {
+  border-color: #007acc;
+}
+
+.editor-filename:disabled {
+  opacity: 0.6;
+}
+
 
 .github-save-button {
   margin-left: auto;

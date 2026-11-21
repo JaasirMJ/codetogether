@@ -37,6 +37,8 @@ function CollaborativeEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
+  const [fileName, setFileName] = useState("main.ts");
+
   const [sharedDocument, setSharedDocument] =
     useState<Y.Text | null>(null);
 
@@ -215,6 +217,22 @@ function CollaborativeEditor({
       return;
     }
 
+    const cleanFileName = fileName.trim();
+
+    if (!cleanFileName) {
+      setSaveMessage("Please enter a filename.");
+      return;
+    }
+
+    if (
+      !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/.test(cleanFileName) ||
+      cleanFileName === "." ||
+      cleanFileName === ".."
+    ) {
+      setSaveMessage("Invalid filename. Avoid spaces and special characters.");
+      return;
+    }
+
     try {
       setIsSaving(true);
       setSaveMessage("");
@@ -228,9 +246,9 @@ function CollaborativeEditor({
           },
           body: JSON.stringify({
             roomId,
-            fileName: "main.ts",
+            fileName: cleanFileName,
             content: sharedDocument.toString(),
-            commitMessage: `Save collaborative code from room ${roomId}`,
+            commitMessage: `Save ${cleanFileName} from CodeTogether room ${roomId}`,
           }),
         }
       );
@@ -265,7 +283,17 @@ function CollaborativeEditor({
       </div>
 
       <div className="editor-toolbar">
-        <span className="editor-filename">main.ts</span>
+        <input
+          className="editor-filename"
+          type="text"
+          value={fileName}
+          onChange={(event) => {
+            setFileName(event.target.value);
+            setSaveMessage("");
+          }}
+          placeholder="Enter filename (e.g. main.py)"
+          disabled={isSaving}
+        />
 
         <button
           className="github-save-button"
