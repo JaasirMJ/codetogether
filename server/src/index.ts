@@ -168,10 +168,129 @@ app.post("/api/nexconn/group/join", async (req, res) => {
   }
 });
 
+// Get GitHub commit history for a collaborative room
+app.get("/api/github/rooms/:roomId/commits", async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(roomId)) {
+      return res.status(400).json({
+        error: "Invalid room ID",
+      });
+    }
+
+    const githubToken = process.env.GITHUB_TOKEN;
+    const owner = process.env.GITHUB_OWNER;
+    const repo = process.env.GITHUB_REPO;
+
+    if (!githubToken || !owner || !repo) {
+      return res.status(500).json({
+        error: "GitHub configuration is missing",
+      });
+    }
+
+    const headers = {
+      Authorization: `Bearer ${githubToken}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    };
+
+    const params = new URLSearchParams({
+      path: `rooms/${roomId}`,
+      per_page: "30",
+    });
+
+    const apiUrl =
+      `https://api.github.com/repos/${owner}/${repo}/commits?${params.toString()}`;
+
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("[GitHub] Commit history error:", data);
+
+      return res.status(502).json({
+        error: "Failed to retrieve GitHub commit history",
+        details: data.message,
+      });
+    }
+
+    // Extract CodeTogether contributor information
+    const commits = data.map((item: any) => {
+      const message = item.commit?.message || "";
+
+      const contributorName =
+        message.match(/^Contributor:\s*(.+)$/mi)?.[1]?.trim() ||
+        item.commit?.author?.name ||
+        "Unknown contributor";
+
+      const contributorId =
+        message.match(/^Contributor ID:\s*(.+)$/mi)?.[1]?.trim() ||
+        null;
+
+      const cleanMessage = message.split(/\r?\n/)[0];
+
+      return {
+        sha: item.sha,
+        shortSha: item.sha.substring(0, 7),
+
+        message: cleanMessage,
+
+        contributor: {
+          name: contributorName,
+          id: contributorId,
+          githubUsername: item.author?.login || null,
+          avatarUrl: item.author?.avatar_url || null,
+        },
+
+        date: item.commit?.author?.date || null,
+
+        commitUrl: item.html_url,
+
+        files: item.files?.map((file: any) => ({
+          fileName: file.filename,
+          status: file.status,
+          additions: file.additions,
+          deletions: file.deletions,
+        })) || [],
+      };
+    });
+
+    console.log(
+      `[GitHub] Retrieved ${commits.length} commits for room ${roomId}`
+    );
+
+    return res.json({
+      success: true,
+      roomId,
+      total: commits.length,
+      commits,
+    });
+  } catch (error) {
+    console.error("[GitHub] Commit history endpoint error:", error);
+
+    return res.status(500).json({
+      error: "Failed to retrieve commit history",
+    });
+  }
+});
+
 // Save a collaborative room's code to GitHub
+// Includes CodeTogether contributor attribution
 app.post("/api/github/commit", async (req, res) => {
   try {
-    const { roomId, fileName, content, commitMessage } = req.body;
+    const {
+      roomId,
+      fileName,
+      content,
+      commitMessage,
+      contributorId,
+      contributorName,
+    } = req.body;
 
     if (!roomId || !fileName || typeof content !== "string") {
       return res.status(400).json({
@@ -189,6 +308,41 @@ app.post("/api/github/commit", async (req, res) => {
         error: "Invalid room ID or filename",
       });
     }
+
+    // Validate contributor details
+    if (
+      typeof contributorId !== "string" ||
+      !contributorId.trim() ||
+      typeof contributorName !== "string" ||
+      !contributorName.trim()
+    ) {
+      return res.status(400).json({
+        error: "Contributor ID and contributor name are required",
+      });
+    }
+
+    if (
+      contributorId.length > 100 ||
+      contributorName.length > 100
+    ) {
+      return res.status(400).json({
+        error: "Contributor details must not exceed 100 characters",
+      });
+    }
+
+    // Keep contributor details on a single line
+    const cleanContributorId = contributorId
+      .trim()
+      .replace(/[\r\n]+/g, " ");
+
+    const cleanContributorName = contributorName
+      .trim()
+      .replace(/[\r\n]+/g, " ");
+
+    const cleanCommitMessage =
+      typeof commitMessage === "string"
+        ? commitMessage.trim().slice(0, 500)
+        : "";
 
     const githubToken = process.env.GITHUB_TOKEN;
     const owner = process.env.GITHUB_OWNER;
@@ -211,6 +365,17 @@ app.post("/api/github/commit", async (req, res) => {
 
     const apiUrl =
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+
+    // Build commit message with contributor attribution
+    const baseMessage =
+      cleanCommitMessage ||
+      `Save ${fileName} from CodeTogether room ${roomId}`;
+
+    const finalCommitMessage = `${baseMessage}
+
+Contributor: ${cleanContributorName}
+Contributor ID: ${cleanContributorId}
+Room ID: ${roomId}`;
 
     // Check whether the file already exists
     let existingSha: string | undefined;
@@ -246,9 +411,7 @@ app.post("/api/github/commit", async (req, res) => {
       method: "PUT",
       headers,
       body: JSON.stringify({
-        message:
-          commitMessage ||
-          `Save ${fileName} from CodeTogether room ${roomId}`,
+        message: finalCommitMessage,
         content: Buffer.from(content, "utf8").toString("base64"),
         ...(existingSha ? { sha: existingSha } : {}),
       }),
@@ -267,12 +430,24 @@ app.post("/api/github/commit", async (req, res) => {
 
     console.log("[GitHub] File saved:", path);
 
+    console.log("[GitHub] Contributor:", {
+      name: cleanContributorName,
+      id: cleanContributorId,
+    });
+
     return res.json({
       success: true,
       message: "Code successfully saved to GitHub",
+
       path,
+
       commitUrl: saveData.commit.html_url,
       fileUrl: saveData.content?.html_url,
+
+      contributor: {
+        name: cleanContributorName,
+        id: cleanContributorId,
+      },
     });
   } catch (error) {
     console.error("[GitHub] Commit error:", error);
