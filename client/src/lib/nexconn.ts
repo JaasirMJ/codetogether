@@ -6,6 +6,9 @@ import {
   SendTextMessageParams,
 } from "@nexconn/chat";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
 let initialized = false;
 let connectionPromise: Promise<string> | null = null;
 let messageHandlerRegistered = false;
@@ -69,7 +72,7 @@ export async function connectNexconn(
 
   connectionPromise = (async () => {
     const response = await fetch(
-      "http://localhost:5000/api/nexconn/token",
+      `${API_BASE_URL}/api/nexconn/token`,
       {
         method: "POST",
         headers: {
@@ -113,8 +116,6 @@ export async function connectNexconn(
 }
 
 // Create or join a Nexconn group
-
-
 export async function openRoomGroup(
   roomId: string,
   isCreator: boolean,
@@ -135,7 +136,7 @@ export async function openRoomGroup(
     }
   } else {
     const response = await fetch(
-      "http://localhost:5000/api/nexconn/group/join",
+      `${API_BASE_URL}/api/nexconn/group/join`,
       {
         method: "POST",
         headers: {
@@ -166,9 +167,7 @@ export async function openRoomGroup(
   return new GroupChannel(roomId);
 }
 
-
 // Send a text message to a room
-
 export async function sendRoomMessage(
   roomId: string,
   text: string
@@ -201,7 +200,6 @@ export async function sendRoomMessage(
     throw error;
   }
 }
-
 
 // Subscribe to messages from a specific room
 export function subscribeToRoomMessages(

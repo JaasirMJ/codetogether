@@ -6,6 +6,12 @@ import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import type { editor } from "monaco-editor";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const YJS_SERVER_URL =
+  import.meta.env.VITE_YJS_URL || "ws://localhost:1234";
+
 const STARTER_CODE = `// Welcome to CodeTogether!
 
 function hello() {
@@ -107,7 +113,6 @@ function CollaborativeEditor({
   const [sharedDocument, setSharedDocument] =
     useState<Y.Text | null>(null);
 
-  // Shared language state
   const [language, setLanguage] =
     useState<SupportedLanguage>("typescript");
 
@@ -116,7 +121,6 @@ function CollaborativeEditor({
 
   const [isLanguageReady, setIsLanguageReady] = useState(false);
 
-  // GitHub commit history state
   const [historyOpen, setHistoryOpen] = useState(false);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -133,7 +137,7 @@ function CollaborativeEditor({
       setHistoryError("");
 
       const response = await fetch(
-        `http://localhost:5000/api/github/rooms/${encodeURIComponent(roomId)}/commits`
+        `${API_BASE_URL}/api/github/rooms/${encodeURIComponent(roomId)}/commits`
       );
 
       const data = await response.json();
@@ -215,11 +219,10 @@ function CollaborativeEditor({
     const ydoc = new Y.Doc();
     const ytext = ydoc.getText("codetogether");
 
-    // Shared metadata is stored separately from the code itself.
     const metadata = ydoc.getMap<unknown>("codetogether-metadata");
 
     const provider = new WebsocketProvider(
-      "ws://localhost:1234",
+      YJS_SERVER_URL,
       `codetogether-${roomId}`,
       ydoc
     );
@@ -469,7 +472,7 @@ function CollaborativeEditor({
       setSavedFileName("");
 
       const response = await fetch(
-        "http://localhost:5000/api/github/commit",
+        `${API_BASE_URL}/api/github/commit`,
         {
           method: "POST",
           headers: {
