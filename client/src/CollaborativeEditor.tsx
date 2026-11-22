@@ -44,6 +44,30 @@ interface Commit {
   }[];
 }
 
+const SUPPORTED_LANGUAGES = [
+  { id: "typescript", label: "TypeScript" },
+  { id: "javascript", label: "JavaScript" },
+  { id: "python", label: "Python" },
+  { id: "java", label: "Java" },
+  { id: "c", label: "C" },
+  { id: "cpp", label: "C++" },
+  { id: "html", label: "HTML" },
+  { id: "css", label: "CSS" },
+  { id: "json", label: "JSON" },
+] as const;
+
+type SupportedLanguage =
+  (typeof SUPPORTED_LANGUAGES)[number]["id"];
+
+function isSupportedLanguage(
+  value: unknown
+): value is SupportedLanguage {
+  return (
+    typeof value === "string" &&
+    SUPPORTED_LANGUAGES.some((language) => language.id === value)
+  );
+}
+
 function formatCommitDate(date: string | null) {
   if (!date) return "Date unavailable";
 
@@ -82,6 +106,15 @@ function CollaborativeEditor({
 
   const [sharedDocument, setSharedDocument] =
     useState<Y.Text | null>(null);
+
+  // Shared language state
+  const [language, setLanguage] =
+    useState<SupportedLanguage>("typescript");
+
+  const [sharedMetadata, setSharedMetadata] =
+    useState<Y.Map<unknown> | null>(null);
+
+  const [isLanguageReady, setIsLanguageReady] = useState(false);
 
   // GitHub commit history state
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -135,11 +168,55 @@ function CollaborativeEditor({
     }
   };
 
+  // Download the current shared file
+  const downloadFile = () => {
+    if (!sharedDocument) {
+      return;
+    }
+
+    const cleanFileName = fileName.trim();
+
+    if (
+      !cleanFileName ||
+      !/^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/.test(cleanFileName) ||
+      cleanFileName === "." ||
+      cleanFileName === ".."
+    ) {
+      alert("Please enter a valid filename before downloading.");
+      return;
+    }
+
+    const content = sharedDocument.toString();
+
+    const blob = new Blob([content], {
+      type: "text/plain;charset=utf-8",
+    });
+
+    const downloadUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = cleanFileName;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(downloadUrl);
+
+    console.log(
+      `[CodeTogether] Downloaded ${cleanFileName}`
+    );
+  };
+
   useEffect(() => {
     if (!editorInstance) return;
 
     const ydoc = new Y.Doc();
     const ytext = ydoc.getText("codetogether");
+
+    // Shared metadata is stored separately from the code itself.
+    const metadata = ydoc.getMap<unknown>("codetogether-metadata");
 
     const provider = new WebsocketProvider(
       "ws://localhost:1234",
@@ -246,6 +323,22 @@ function CollaborativeEditor({
     provider.awareness.on("update", updateCursorStyles);
     updateCursorStyles();
 
+    // Synchronize filename and language across collaborators.
+    const updateSharedMetadata = () => {
+      const sharedLanguage = metadata.get("language");
+      const sharedFileName = metadata.get("fileName");
+
+      if (isSupportedLanguage(sharedLanguage)) {
+        setLanguage(sharedLanguage);
+      }
+
+      if (typeof sharedFileName === "string") {
+        setFileName(sharedFileName);
+      }
+    };
+
+    metadata.observe(updateSharedMetadata);
+
     provider.on("status", ({ status }: { status: string }) => {
       setConnectionStatus(
         status === "connected" ? "Connected" : "Connecting..."
@@ -257,9 +350,24 @@ function CollaborativeEditor({
     let binding: MonacoBinding | null = null;
 
     provider.on("sync", (isSynced: boolean) => {
-      if (!isSynced || binding) return;
+      if (!isSynced) return;
 
       console.log(`[Yjs ${roomId}] Document synchronized`);
+
+      if (!metadata.has("language")) {
+        metadata.set("language", "typescript");
+      }
+
+      if (!metadata.has("fileName")) {
+        metadata.set("fileName", "main.ts");
+      }
+
+      updateSharedMetadata();
+
+      setSharedMetadata(metadata);
+      setIsLanguageReady(true);
+
+      if (binding) return;
 
       if (ytext.length === 0) {
         ytext.insert(0, STARTER_CODE);
@@ -288,10 +396,13 @@ function CollaborativeEditor({
       binding?.destroy();
 
       provider.awareness.off("update", updateCursorStyles);
+      metadata.unobserve(updateSharedMetadata);
 
       cursorStyle.remove();
 
       setSharedDocument(null);
+      setSharedMetadata(null);
+      setIsLanguageReady(false);
 
       provider.destroy();
       ydoc.destroy();
@@ -305,6 +416,22 @@ function CollaborativeEditor({
     userId,
     onCollaboratorsChange,
   ]);
+
+  // Change language for everyone in this room.
+  const handleLanguageChange = (nextLanguage: string) => {
+    if (!isSupportedLanguage(nextLanguage)) return;
+
+    setLanguage(nextLanguage);
+
+    if (sharedMetadata) {
+      sharedMetadata.set("language", nextLanguage);
+
+      console.log(
+        `[Yjs ${roomId}] Shared language changed to:`,
+        nextLanguage
+      );
+    }
+  };
 
   // Save the shared Yjs document to GitHub
   const saveToGitHub = async () => {
@@ -379,7 +506,6 @@ function CollaborativeEditor({
         displayName,
       });
 
-      // Update the visible history after a successful save
       if (historyOpen) {
         void loadCommitHistory();
       }
@@ -410,7 +536,11 @@ function CollaborativeEditor({
           type="text"
           value={fileName}
           onChange={(event) => {
-            setFileName(event.target.value);
+            const nextFileName = event.target.value;
+
+            setFileName(nextFileName);
+            sharedMetadata?.set("fileName", nextFileName);
+
             setSaveStatus("idle");
             setSaveMessage("");
             setCommitUrl("");
@@ -419,6 +549,22 @@ function CollaborativeEditor({
           placeholder="Enter filename (e.g. main.py)"
           disabled={isSaving}
         />
+
+        <select
+          className="editor-language-select"
+          value={language}
+          onChange={(event) =>
+            handleLanguageChange(event.target.value)
+          }
+          disabled={!isLanguageReady}
+          aria-label="Select programming language"
+        >
+          {SUPPORTED_LANGUAGES.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.label}
+            </option>
+          ))}
+        </select>
 
         <input
           className="editor-commit-message"
@@ -439,6 +585,15 @@ function CollaborativeEditor({
             : !sharedDocument
               ? "Connecting..."
               : "Save to GitHub"}
+        </button>
+
+        <button
+          className="download-file-button"
+          onClick={downloadFile}
+          type="button"
+          disabled={!sharedDocument}
+        >
+          Download File
         </button>
 
         <button
@@ -585,7 +740,7 @@ function CollaborativeEditor({
       <div className="editor-monaco-container">
         <Editor
           height="100%"
-          language="typescript"
+          language={language}
           theme="vs-dark"
           defaultValue={STARTER_CODE}
           onMount={handleEditorMount}
